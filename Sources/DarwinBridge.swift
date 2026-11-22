@@ -700,9 +700,6 @@ public final class DarwinBridge {
             standard: realStandard ?? "Wi-Fi 6 (802.11ax)"
         )
     }
-        
-        return (interfaces, wifiMetrics)
-    }
     
     // MARK: - Process Listing & Management
     public func listProcesses() -> [ProcessItem] {
