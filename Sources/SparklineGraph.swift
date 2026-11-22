@@ -17,7 +17,8 @@ public struct WindowsGraphView: View {
         showGrid: Bool = true
     ) {
         self.values = values
-        self.maxValue = max(0.01, maxValue)
+        let safeMax = (maxValue.isNaN || maxValue.isInfinite || maxValue <= 0.01) ? 100.0 : maxValue
+        self.maxValue = safeMax
         self.unit = unit
         self.accentColor = accentColor
         self.title = title
@@ -32,7 +33,7 @@ public struct WindowsGraphView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.secondary)
                     Spacer()
-                    if let latest = values.last {
+                    if let latest = values.last, !latest.isNaN {
                         Text(String(format: "%.1f %@", latest, unit))
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                             .foregroundColor(accentColor)
@@ -55,23 +56,24 @@ public struct WindowsGraphView: View {
                         let w = geo.size.width
                         let h = geo.size.height
                         
-                        Path { path in
-                            for step in [0.25, 0.50, 0.75] {
-                                let y = h * CGFloat(1.0 - step)
-                                path.move(to: CGPoint(x: 0, y: y))
-                                path.addLine(to: CGPoint(x: w, y: y))
+                        if w > 0 && h > 0 {
+                            Path { path in
+                                for step in [0.25, 0.50, 0.75] {
+                                    let y = h * CGFloat(1.0 - step)
+                                    path.move(to: CGPoint(x: 0, y: y))
+                                    path.addLine(to: CGPoint(x: w, y: y))
+                                }
+                                for step in [0.25, 0.50, 0.75] {
+                                    let x = w * CGFloat(step)
+                                    path.move(to: CGPoint(x: x, y: 0))
+                                    path.addLine(to: CGPoint(x: x, y: h))
+                                }
                             }
-                            // Vertical grid lines
-                            for step in [0.25, 0.50, 0.75] {
-                                let x = w * CGFloat(step)
-                                path.move(to: CGPoint(x: x, y: 0))
-                                path.addLine(to: CGPoint(x: x, y: h))
-                            }
+                            .stroke(
+                                Color.primary.opacity(0.06),
+                                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                            )
                         }
-                        .stroke(
-                            Color.primary.opacity(0.06),
-                            style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-                        )
                     }
                 }
                 
@@ -80,49 +82,63 @@ public struct WindowsGraphView: View {
                     let w = geo.size.width
                     let h = geo.size.height
                     
-                    if values.count >= 2 {
-                        let stepX = w / CGFloat(values.count - 1)
-                        
-                        // Area fill
-                        Path { path in
-                            path.move(to: CGPoint(x: 0, y: h))
-                            for (index, val) in values.enumerated() {
-                                let normalized = CGFloat(min(maxValue, max(0.0, val)) / maxValue)
-                                let x = CGFloat(index) * stepX
-                                let y = h * (1.0 - normalized)
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                            path.addLine(to: CGPoint(x: w, y: h))
-                            path.closeSubpath()
-                        }
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    accentColor.opacity(0.35),
-                                    accentColor.opacity(0.03)
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        
-                        // Stroke line
-                        Path { path in
-                            for (index, val) in values.enumerated() {
-                                let normalized = CGFloat(min(maxValue, max(0.0, val)) / maxValue)
-                                let x = CGFloat(index) * stepX
-                                let y = h * (1.0 - normalized)
-                                if index == 0 {
-                                    path.move(to: CGPoint(x: x, y: y))
-                                } else {
+                    if w > 0 && h > 0 {
+                        if values.count >= 2 {
+                            let stepX = w / CGFloat(max(1, values.count - 1))
+                            
+                            // Area fill
+                            Path { path in
+                                path.move(to: CGPoint(x: 0, y: h))
+                                for (index, val) in values.enumerated() {
+                                    let safeVal = (val.isNaN || val.isInfinite) ? 0.0 : val
+                                    let normalized = CGFloat(min(maxValue, max(0.0, safeVal)) / maxValue)
+                                    let x = CGFloat(index) * stepX
+                                    let y = h * (1.0 - normalized)
                                     path.addLine(to: CGPoint(x: x, y: y))
                                 }
+                                path.addLine(to: CGPoint(x: w, y: h))
+                                path.closeSubpath()
                             }
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        accentColor.opacity(0.35),
+                                        accentColor.opacity(0.03)
+                                    ]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            
+                            // Stroke line
+                            Path { path in
+                                for (index, val) in values.enumerated() {
+                                    let safeVal = (val.isNaN || val.isInfinite) ? 0.0 : val
+                                    let normalized = CGFloat(min(maxValue, max(0.0, safeVal)) / maxValue)
+                                    let x = CGFloat(index) * stepX
+                                    let y = h * (1.0 - normalized)
+                                    if index == 0 {
+                                        path.move(to: CGPoint(x: x, y: y))
+                                    } else {
+                                        path.addLine(to: CGPoint(x: x, y: y))
+                                    }
+                                }
+                            }
+                            .stroke(
+                                accentColor,
+                                style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
+                            )
+                        } else if let single = values.first {
+                            let safeVal = (single.isNaN || single.isInfinite) ? 0.0 : single
+                            let normalized = CGFloat(min(maxValue, max(0.0, safeVal)) / maxValue)
+                            let y = h * (1.0 - normalized)
+                            
+                            Path { path in
+                                path.move(to: CGPoint(x: 0, y: y))
+                                path.addLine(to: CGPoint(x: w, y: y))
+                            }
+                            .stroke(accentColor, style: StrokeStyle(lineWidth: 1.8))
                         }
-                        .stroke(
-                            accentColor,
-                            style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
-                        )
                     }
                 }
                 
@@ -160,7 +176,8 @@ public struct SparklineView: View {
     
     public init(values: [Double], maxValue: Double = 100.0, accentColor: Color) {
         self.values = values
-        self.maxValue = max(0.01, maxValue)
+        let safeMax = (maxValue.isNaN || maxValue.isInfinite || maxValue <= 0.01) ? 100.0 : maxValue
+        self.maxValue = safeMax
         self.accentColor = accentColor
     }
     
@@ -169,14 +186,15 @@ public struct SparklineView: View {
             let w = geo.size.width
             let h = geo.size.height
             
-            if values.count >= 2 {
-                let stepX = w / CGFloat(values.count - 1)
+            if w > 0 && h > 0 && values.count >= 2 {
+                let stepX = w / CGFloat(max(1, values.count - 1))
                 
                 // Area fill
                 Path { path in
                     path.move(to: CGPoint(x: 0, y: h))
                     for (index, val) in values.enumerated() {
-                        let normalized = CGFloat(min(maxValue, max(0.0, val)) / maxValue)
+                        let safeVal = (val.isNaN || val.isInfinite) ? 0.0 : val
+                        let normalized = CGFloat(min(maxValue, max(0.0, safeVal)) / maxValue)
                         let x = CGFloat(index) * stepX
                         let y = h * (1.0 - normalized)
                         path.addLine(to: CGPoint(x: x, y: y))
@@ -195,7 +213,8 @@ public struct SparklineView: View {
                 // Line
                 Path { path in
                     for (index, val) in values.enumerated() {
-                        let normalized = CGFloat(min(maxValue, max(0.0, val)) / maxValue)
+                        let safeVal = (val.isNaN || val.isInfinite) ? 0.0 : val
+                        let normalized = CGFloat(min(maxValue, max(0.0, safeVal)) / maxValue)
                         let x = CGFloat(index) * stepX
                         let y = h * (1.0 - normalized)
                         if index == 0 {

@@ -31,13 +31,24 @@ public final class ProcessesViewModel: ObservableObject {
     
     private var timerCancellable: AnyCancellable?
     private let bridge = DarwinBridge.shared
+    private var isRefreshing: Bool = false
     
     public init() {
+        // Pure and lightweight init
+    }
+    
+    public func startMonitoring() {
         refresh()
         startTimer()
     }
     
+    public func stopMonitoring() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
+    }
+    
     public func startTimer() {
+        timerCancellable?.cancel()
         timerCancellable = Timer.publish(every: 1.5, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
@@ -46,8 +57,17 @@ public final class ProcessesViewModel: ObservableObject {
     }
     
     public func refresh() {
-        let list = bridge.listProcesses()
-        self.processes = list
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        
+        Task.detached(priority: .userInitiated) { [weak self, bridge] in
+            let list = bridge.listProcesses()
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                self.isRefreshing = false
+                self.processes = list
+            }
+        }
     }
     
     public var filteredProcesses: [ProcessItem] {

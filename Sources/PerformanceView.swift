@@ -36,6 +36,12 @@ public struct PerformanceView: View {
                 }
             }
         }
+        .onAppear {
+            viewModel.startMonitoring()
+        }
+        .onDisappear {
+            viewModel.stopMonitoring()
+        }
     }
     
     // MARK: - Master Cards Carousel
@@ -175,7 +181,6 @@ public struct PerformanceView: View {
     // MARK: - CPU Detail Section
     private var cpuDetailSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Header
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(viewModel.cpuMetrics.cpuName)
@@ -186,7 +191,6 @@ public struct PerformanceView: View {
                 }
                 Spacer()
                 
-                // View Mode Picker (Overall vs Logical Processors)
                 Picker("View", selection: $viewModel.cpuViewMode) {
                     ForEach(CPUViewMode.allCases) { mode in
                         Text(mode == .overall ? "Overall" : "All Cores").tag(mode)
@@ -197,7 +201,6 @@ public struct PerformanceView: View {
             }
             
             if viewModel.cpuViewMode == .overall {
-                // 60-Second Overall Rolling Graph
                 WindowsGraphView(
                     values: viewModel.cpuOverallHistory.values,
                     maxValue: 100.0,
@@ -208,7 +211,6 @@ public struct PerformanceView: View {
                 )
                 .frame(height: 180)
             } else {
-                // Windows Logical Processors Grid (All Cores!)
                 LogicalCoresGrid(
                     coreLoads: viewModel.cpuMetrics.coreLoads,
                     coreHistories: viewModel.coreHistories,
@@ -216,7 +218,6 @@ public struct PerformanceView: View {
                 )
             }
             
-            // Windows-Style CPU Specifications Grid
             VStack(spacing: 8) {
                 statRow(label1: "Utilization", value1: String(format: "%.1f%%", viewModel.cpuMetrics.overallLoad),
                         label2: "Logical Cores", value2: "\(viewModel.cpuMetrics.logicalCores)")
@@ -244,7 +245,6 @@ public struct PerformanceView: View {
                     .foregroundColor(MetricCategory.memory.accentColor)
             }
             
-            // 60-Second Memory Graph
             WindowsGraphView(
                 values: viewModel.memoryHistory.values,
                 maxValue: 100.0,
@@ -255,7 +255,6 @@ public struct PerformanceView: View {
             )
             .frame(height: 180)
             
-            // Memory Composition Bar
             VStack(alignment: .leading, spacing: 6) {
                 Text("Memory Composition")
                     .font(.system(size: 13, weight: .semibold))
@@ -289,7 +288,6 @@ public struct PerformanceView: View {
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(10)
             
-            // Specs table
             VStack(spacing: 8) {
                 statRow(label1: "Total RAM", value1: String(format: "%.2f GB", viewModel.memoryMetrics.totalGB),
                         label2: "In Use", value2: String(format: "%.2f GB", viewModel.memoryMetrics.usedGB))
@@ -315,7 +313,6 @@ public struct PerformanceView: View {
                     .foregroundColor(MetricCategory.disk.accentColor)
             }
             
-            // 60-Second Read / Write Transfer Rate Graph
             WindowsGraphView(
                 values: viewModel.diskReadHistory.values,
                 maxValue: max(10.0, viewModel.diskReadHistory.peak * 1.2),
@@ -326,7 +323,6 @@ public struct PerformanceView: View {
             )
             .frame(height: 180)
             
-            // Storage Capacity Bar
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Storage Capacity")
@@ -345,7 +341,6 @@ public struct PerformanceView: View {
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(10)
             
-            // Specs table
             VStack(spacing: 8) {
                 statRow(label1: "Active Time", value1: String(format: "%.0f%%", viewModel.storageMetrics.activeTimePercentage),
                         label2: "Total Capacity", value2: String(format: "%.1f GB", viewModel.storageMetrics.totalGB))
@@ -378,7 +373,6 @@ public struct PerformanceView: View {
                 }
             }
             
-            // 60-Second Download/Upload Throughput Graph
             WindowsGraphView(
                 values: viewModel.networkDownHistory.values,
                 maxValue: max(5.0, viewModel.networkDownHistory.peak * 1.2),
@@ -389,7 +383,6 @@ public struct PerformanceView: View {
             )
             .frame(height: 180)
             
-            // Wi-Fi Radio & Link Details Table
             VStack(spacing: 8) {
                 statRow(label1: "SSID", value1: wifi.ssid,
                         label2: "Wi-Fi Link Speed", value2: String(format: "%.0f Mbps", wifi.linkSpeedMbps))
@@ -456,7 +449,6 @@ public struct PerformanceView: View {
                     .foregroundColor(MetricCategory.gpu.accentColor)
             }
             
-            // 60-Second GPU Graph
             WindowsGraphView(
                 values: viewModel.gpuHistory.values,
                 maxValue: 100.0,
@@ -467,7 +459,6 @@ public struct PerformanceView: View {
             )
             .frame(height: 180)
             
-            // Specs table
             VStack(spacing: 8) {
                 statRow(label1: "Device Utilization", value1: String(format: "%.1f%%", gpu.deviceUtilization),
                         label2: "Renderer 3D Load", value2: String(format: "%.1f%%", gpu.rendererUtilization))

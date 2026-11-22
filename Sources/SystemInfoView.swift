@@ -3,6 +3,7 @@ import Darwin
 
 public struct SystemInfoView: View {
     @ObservedObject var performanceVM: PerformanceViewModel
+    @State private var batteryLevel: Int = 100
     
     public init(performanceVM: PerformanceViewModel) {
         self.performanceVM = performanceVM
@@ -50,6 +51,14 @@ public struct SystemInfoView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             UIDevice.current.isBatteryMonitoringEnabled = true
+            updateBatteryLevel()
+            NotificationCenter.default.addObserver(
+                forName: UIDevice.batteryLevelDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                updateBatteryLevel()
+            }
         }
     }
     
@@ -73,10 +82,15 @@ public struct SystemInfoView: View {
         HStack {
             Text("Battery Level")
             Spacer()
-            let level = UIDevice.current.batteryLevel
-            let pct = level >= 0 ? Int(level * 100) : 100
-            Text("\(pct)%")
+            Text("\(batteryLevel)%")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
+        }
+    }
+    
+    private func updateBatteryLevel() {
+        let level = UIDevice.current.batteryLevel
+        if level >= 0 {
+            batteryLevel = Int(level * 100)
         }
     }
     
@@ -105,8 +119,9 @@ public struct SystemInfoView: View {
         var size = 0
         sysctlbyname("kern.osrelease", nil, &size, nil, 0)
         if size > 0 {
-            var release = [CChar](repeating: 0, count: size)
+            var release = [CChar](repeating: 0, count: size + 1)
             if sysctlbyname("kern.osrelease", &release, &size, nil, 0) == 0 {
+                release[release.count - 1] = 0
                 return "Darwin " + String(cString: release)
             }
         }

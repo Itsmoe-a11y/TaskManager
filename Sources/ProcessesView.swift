@@ -74,10 +74,11 @@ public struct ProcessesView: View {
             
             Divider()
             
-            // Process List
-            List(selection: $viewModel.selectedProcess) {
+            // Process List (Decoupled from selection binding to prevent Int32 type mismatch)
+            List {
                 ForEach(viewModel.filteredProcesses) { proc in
                     processRow(proc)
+                        .background(viewModel.selectedProcess?.pid == proc.pid ? Color.accentColor.opacity(0.15) : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             viewModel.selectedProcess = proc
@@ -85,7 +86,9 @@ public struct ProcessesView: View {
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                confirmKillProcess = proc
+                                DispatchQueue.main.async {
+                                    confirmKillProcess = proc
+                                }
                             } label: {
                                 Label("End Task", systemImage: "xmark.octagon.fill")
                             }
@@ -99,6 +102,12 @@ public struct ProcessesView: View {
         }
         .navigationTitle("Processes")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            viewModel.startMonitoring()
+        }
+        .onDisappear {
+            viewModel.stopMonitoring()
+        }
         .sheet(isPresented: $showingDetailSheet) {
             if let proc = viewModel.selectedProcess {
                 processDetailSheet(proc)

@@ -6,19 +6,9 @@
 	<string>dev.moe.taskmanager</string>
 	<key>platform-application</key>
 	<true/>
-	<key>com.apple.private.security.no-container</key>
-	<true/>
 	<key>com.apple.private.security.no-sandbox</key>
 	<true/>
-	<key>com.apple.private.skip-library-validation</key>
-	<true/>
-	<key>task_for_pid-allow</key>
-	<true/>
-	<key>com.apple.system-task-ports</key>
-	<true/>
-	<key>proc_info-allow</key>
-	<true/>
-	<key>get-task-allow</key>
+	<key>com.apple.private.security.storage.AppDataContainers</key>
 	<true/>
 </dict>
 </plist>

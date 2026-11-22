@@ -55,10 +55,20 @@ public final class PerformanceViewModel: ObservableObject {
     
     private var timerCancellable: AnyCancellable?
     private let bridge = DarwinBridge.shared
+    private var isRefreshing: Bool = false
     
     public init() {
+        // Keep init completely pure and lightweight to allow immediate first-frame launch
+    }
+    
+    public func startMonitoring() {
         refresh()
         restartTimer()
+    }
+    
+    public func stopMonitoring() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
     }
     
     public func restartTimer() {
@@ -73,46 +83,52 @@ public final class PerformanceViewModel: ObservableObject {
     }
     
     public func refresh() {
-        // 1. CPU
-        let cpu = bridge.sampleCPUMetrics()
-        self.cpuMetrics = cpu
-        self.cpuOverallHistory.append(cpu.overallLoad)
+        guard !isRefreshing else { return }
+        isRefreshing = true
         
-        for core in cpu.coreLoads {
-            if self.coreHistories[core.coreIndex] == nil {
-                self.coreHistories[core.coreIndex] = HistoryBuffer(capacity: 60)
+        Task.detached(priority: .userInitiated) { [weak self, bridge] in
+            let cpu = bridge.sampleCPUMetrics()
+            let gpu = bridge.sampleGPUMetrics()
+            let mem = bridge.sampleMemoryMetrics()
+            let st = bridge.sampleStorageMetrics()
+            let net = bridge.sampleNetworkMetrics()
+            
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                self.isRefreshing = false
+                
+                self.cpuMetrics = cpu
+                self.cpuOverallHistory.append(cpu.overallLoad)
+                
+                for core in cpu.coreLoads {
+                    if self.coreHistories[core.coreIndex] == nil {
+                        self.coreHistories[core.coreIndex] = HistoryBuffer(capacity: 60)
+                    }
+                    self.coreHistories[core.coreIndex]?.append(core.loadPercentage)
+                }
+                
+                self.gpuMetrics = gpu
+                self.gpuHistory.append(gpu.rendererUtilization > 0 ? gpu.rendererUtilization : gpu.deviceUtilization)
+                
+                self.memoryMetrics = mem
+                self.memoryHistory.append(mem.usedPercentage)
+                
+                self.storageMetrics = st
+                self.diskReadHistory.append(st.readBytesPerSec / 1_048_576.0)
+                self.diskWriteHistory.append(st.writeBytesPerSec / 1_048_576.0)
+                
+                self.networkInterfaces = net.interfaces
+                self.wifiMetrics = net.wifi
+                
+                var totalDown: Double = 0
+                var totalUp: Double = 0
+                for iface in net.interfaces {
+                    totalDown += iface.downloadBytesPerSec
+                    totalUp += iface.uploadBytesPerSec
+                }
+                self.networkDownHistory.append(totalDown / 1_048_576.0)
+                self.networkUpHistory.append(totalUp / 1_048_576.0)
             }
-            self.coreHistories[core.coreIndex]?.append(core.loadPercentage)
         }
-        
-        // 2. GPU
-        let gpu = bridge.sampleGPUMetrics()
-        self.gpuMetrics = gpu
-        self.gpuHistory.append(gpu.rendererUtilization > 0 ? gpu.rendererUtilization : gpu.deviceUtilization)
-        
-        // 3. Memory
-        let mem = bridge.sampleMemoryMetrics()
-        self.memoryMetrics = mem
-        self.memoryHistory.append(mem.usedPercentage)
-        
-        // 4. Storage
-        let st = bridge.sampleStorageMetrics()
-        self.storageMetrics = st
-        self.diskReadHistory.append(st.readBytesPerSec / 1_048_576.0)
-        self.diskWriteHistory.append(st.writeBytesPerSec / 1_048_576.0)
-        
-        // 5. Network & Wi-Fi
-        let net = bridge.sampleNetworkMetrics()
-        self.networkInterfaces = net.interfaces
-        self.wifiMetrics = net.wifi
-        
-        var totalDown: Double = 0
-        var totalUp: Double = 0
-        for iface in net.interfaces {
-            totalDown += iface.downloadBytesPerSec
-            totalUp += iface.uploadBytesPerSec
-        }
-        self.networkDownHistory.append(totalDown / 1_048_576.0) // MB/s
-        self.networkUpHistory.append(totalUp / 1_048_576.0)
     }
 }

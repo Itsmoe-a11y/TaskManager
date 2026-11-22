@@ -7,15 +7,18 @@ public struct HistoryBuffer {
     private var elements: [Double]
     
     public init(capacity: Int = 60, initialValue: Double = 0.0) {
-        self.capacity = max(2, capacity)
-        self.elements = Array(repeating: initialValue, count: capacity)
+        let safeCapacity = max(2, capacity)
+        self.capacity = safeCapacity
+        let safeInit = (initialValue.isNaN || initialValue.isInfinite) ? 0.0 : initialValue
+        self.elements = Array(repeating: safeInit, count: safeCapacity)
     }
     
     public mutating func append(_ value: Double) {
-        if elements.count >= capacity {
+        let safeVal = (value.isNaN || value.isInfinite) ? 0.0 : value
+        while elements.count >= capacity {
             elements.removeFirst()
         }
-        elements.append(value)
+        elements.append(safeVal)
     }
     
     public var values: [Double] {
@@ -27,12 +30,14 @@ public struct HistoryBuffer {
     }
     
     public var peak: Double {
-        return elements.max() ?? 0.0
+        let maxVal = elements.max() ?? 0.0
+        return (maxVal.isNaN || maxVal.isInfinite) ? 0.0 : maxVal
     }
     
     public var average: Double {
         guard !elements.isEmpty else { return 0.0 }
-        return elements.reduce(0, +) / Double(elements.count)
+        let sum = elements.reduce(0.0) { $0 + ($1.isNaN ? 0.0 : $1) }
+        return sum / Double(elements.count)
     }
 }
 
@@ -46,7 +51,8 @@ public struct CoreLoad: Identifiable, Equatable {
     public init(coreIndex: Int, loadPercentage: Double, isPerformanceCore: Bool = false) {
         self.id = coreIndex
         self.coreIndex = coreIndex
-        self.loadPercentage = min(100.0, max(0.0, loadPercentage))
+        let val = (loadPercentage.isNaN || loadPercentage.isInfinite) ? 0.0 : loadPercentage
+        self.loadPercentage = min(100.0, max(0.0, val))
         self.isPerformanceCore = isPerformanceCore
     }
 }
@@ -83,7 +89,8 @@ public struct CPUMetrics: Equatable {
         performanceCores: Int = 2,
         efficiencyCores: Int = 4
     ) {
-        self.overallLoad = min(100.0, max(0.0, overallLoad))
+        let loadVal = (overallLoad.isNaN || overallLoad.isInfinite) ? 0.0 : overallLoad
+        self.overallLoad = min(100.0, max(0.0, loadVal))
         self.coreLoads = coreLoads
         self.userPercentage = userPercentage
         self.systemPercentage = systemPercentage
@@ -126,9 +133,12 @@ public struct GPUMetrics: Equatable {
         tilerUtilization: Double = 0.0,
         gpuName: String = "Apple GPU"
     ) {
-        self.deviceUtilization = min(100.0, max(0.0, deviceUtilization))
-        self.rendererUtilization = min(100.0, max(0.0, rendererUtilization))
-        self.tilerUtilization = min(100.0, max(0.0, tilerUtilization))
+        let dev = (deviceUtilization.isNaN || deviceUtilization.isInfinite) ? 0.0 : deviceUtilization
+        let rend = (rendererUtilization.isNaN || rendererUtilization.isInfinite) ? 0.0 : rendererUtilization
+        let tile = (tilerUtilization.isNaN || tilerUtilization.isInfinite) ? 0.0 : tilerUtilization
+        self.deviceUtilization = min(100.0, max(0.0, dev))
+        self.rendererUtilization = min(100.0, max(0.0, rend))
+        self.tilerUtilization = min(100.0, max(0.0, tile))
         self.gpuName = gpuName
     }
 }
@@ -199,12 +209,15 @@ public struct StorageMetrics: Equatable {
         usedBytes: UInt64 = 0,
         activeTimePercentage: Double = 0.0
     ) {
-        self.readBytesPerSec = max(0.0, readBytesPerSec)
-        self.writeBytesPerSec = max(0.0, writeBytesPerSec)
+        let r = (readBytesPerSec.isNaN || readBytesPerSec.isInfinite) ? 0.0 : readBytesPerSec
+        let w = (writeBytesPerSec.isNaN || writeBytesPerSec.isInfinite) ? 0.0 : writeBytesPerSec
+        let a = (activeTimePercentage.isNaN || activeTimePercentage.isInfinite) ? 0.0 : activeTimePercentage
+        self.readBytesPerSec = max(0.0, r)
+        self.writeBytesPerSec = max(0.0, w)
         self.totalBytes = totalBytes
         self.freeBytes = freeBytes
         self.usedBytes = usedBytes
-        self.activeTimePercentage = min(100.0, max(0.0, activeTimePercentage))
+        self.activeTimePercentage = min(100.0, max(0.0, a))
     }
     
     public var usedPercentage: Double {
@@ -255,8 +268,10 @@ public struct NetworkInterfaceMetrics: Identifiable, Equatable {
     ) {
         self.interfaceName = interfaceName
         self.displayName = displayName
-        self.downloadBytesPerSec = max(0.0, downloadBytesPerSec)
-        self.uploadBytesPerSec = max(0.0, uploadBytesPerSec)
+        let d = (downloadBytesPerSec.isNaN || downloadBytesPerSec.isInfinite) ? 0.0 : downloadBytesPerSec
+        let u = (uploadBytesPerSec.isNaN || uploadBytesPerSec.isInfinite) ? 0.0 : uploadBytesPerSec
+        self.downloadBytesPerSec = max(0.0, d)
+        self.uploadBytesPerSec = max(0.0, u)
         self.totalReceivedBytes = totalReceivedBytes
         self.totalSentBytes = totalSentBytes
         self.ipAddress = ipAddress
@@ -289,7 +304,8 @@ public struct WiFiMetrics: Equatable {
         self.bssid = bssid
         self.rssiDbm = rssiDbm
         self.signalQualityPercent = min(100, max(0, signalQualityPercent))
-        self.linkSpeedMbps = linkSpeedMbps
+        let spd = (linkSpeedMbps.isNaN || linkSpeedMbps.isInfinite) ? 866.0 : linkSpeedMbps
+        self.linkSpeedMbps = spd
         self.channel = channel
         self.band = band
         self.standard = standard
@@ -321,7 +337,8 @@ public struct ProcessItem: Identifiable, Equatable, Hashable {
         self.id = pid
         self.pid = pid
         self.name = name
-        self.cpuPercentage = min(100.0, max(0.0, cpuPercentage))
+        let cpu = (cpuPercentage.isNaN || cpuPercentage.isInfinite) ? 0.0 : cpuPercentage
+        self.cpuPercentage = min(100.0, max(0.0, cpu))
         self.memoryBytes = memoryBytes
         self.threadsCount = threadsCount
         self.user = user
