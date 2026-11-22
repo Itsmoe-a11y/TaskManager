@@ -1,0 +1,113 @@
+name: Build TaskManager (.ipa & .tipa)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      upload_release:
+        description: 'Upload package to GitHub Release'
+        required: false
+        type: boolean
+        default: true
+      release_tag:
+        description: 'Release Tag (defaults to v1.0.0)'
+        required: false
+        type: string
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build_app:
+    name: Build TaskManager iOS App
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cache Homebrew
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /usr/local/Homebrew
+          key: brew-tools-${{ runner.os }}-xcodegen-ldid-v1
+          restore-keys: |
+            brew-tools-${{ runner.os }}-
+
+      - name: Install Build Toolchain
+        run: |
+          brew install xcodegen ldid
+
+      - name: Show Xcode & SDK Info
+        run: |
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Make Scripts Executable
+        run: |
+          chmod +x tools/*.sh
+
+      - name: Compile and Package TaskManager
+        run: |
+          ./tools/build-app.sh "$GITHUB_WORKSPACE"
+
+      - name: Verify IPA Structure & Entitlements
+        run: |
+          echo "==> Verifying Packages:"
+          ls -lh "$GITHUB_WORKSPACE/TaskManager.ipa" "$GITHUB_WORKSPACE/TaskManager.tipa"
+          
+          echo "==> Verifying Mach-O entitlements:"
+          mkdir -p /tmp/verify
+          unzip -q "$GITHUB_WORKSPACE/TaskManager.ipa" -d /tmp/verify
+          ldid -e /tmp/verify/Payload/TaskManager.app/TaskManager
+          
+          if ! ldid -e /tmp/verify/Payload/TaskManager.app/TaskManager | grep -q "application-identifier"; then
+            echo "FATAL: Entitlements missing from final binary!" >&2
+            exit 1
+          fi
+          echo "SUCCESS: TaskManager binary verified with valid entitlements."
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskManager-Packages
+          path: |
+            TaskManager.ipa
+            TaskManager.tipa
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.upload_release == 'true') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.event.inputs.release_tag || 'v1.0.0' }}
+          name: "TaskManager ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.event.inputs.release_tag || 'v1.0.0' }}"
+          body: |
+            ## TaskManager for iOS (Windows Task Manager style)
+
+            A native, high-performance system monitor and task manager for iOS (iOS 15.0+), designed for **TrollStore** and **jailbroken** devices.
+
+            ### Features:
+            - 📊 **Per-Core CPU Load**: Real-time utilization for all logical cores with individual sparkline graphs (P-cores and E-cores), plus overall CPU load and system uptime.
+            - 🎮 **GPU Utilization**: Real-time 3D / Renderer load tracking and Metal device metrics.
+            - 🧠 **Memory (RAM) Composition**: Interactive breakdown of Used, Wired, Active, Inactive, Compressed, and Free RAM with 60-second rolling history.
+            - 💾 **Storage Speed & Disk I/O**: Real-time read and write throughput (MB/s) and APFS storage capacity.
+            - 📶 **Network & Wi-Fi Link Speed**: Real-time download/upload bandwidth, Wi-Fi link speed (e.g. 866 Mbps / 1200 Mbps), RSSI signal strength (dBm), Wi-Fi generation, channel, frequency, and IP addresses.
+            - 📋 **Process Manager (End Task)**: Live process list sorted by CPU %, Memory, or Name with instant "End Task" termination.
+            - 💻 **Detailed Hardware Diagnostics**: SoC architecture, core topologies, Darwin kernel version, thermal state, and battery status.
+
+            ### Installation:
+            - Open `TaskManager.tipa` (or `TaskManager.ipa`) in **TrollStore** and tap **Install**.
+          files: |
+            TaskManager.ipa
+            TaskManager.tipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
