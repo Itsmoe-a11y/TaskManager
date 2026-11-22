@@ -48,6 +48,9 @@ public struct SystemInfoView: View {
         .listStyle(InsetGroupedListStyle())
         .navigationTitle("System Diagnostics")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            UIDevice.current.isBatteryMonitoringEnabled = true
+        }
     }
     
     private var thermalRow: some View {
@@ -70,7 +73,6 @@ public struct SystemInfoView: View {
         HStack {
             Text("Battery Level")
             Spacer()
-            UIDevice.current.isBatteryMonitoringEnabled = true
             let level = UIDevice.current.batteryLevel
             let pct = level >= 0 ? Int(level * 100) : 100
             Text("\(pct)%")

@@ -297,7 +297,7 @@ public struct WiFiMetrics: Equatable {
 }
 
 // MARK: - Process Models
-public struct ProcessItem: Identifiable, Equatable {
+public struct ProcessItem: Identifiable, Equatable, Hashable {
     public let id: Int32
     public let pid: Int32
     public let name: String
@@ -327,6 +327,10 @@ public struct ProcessItem: Identifiable, Equatable {
         self.user = user
         self.isApp = isApp
         self.path = path
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(pid)
     }
     
     public var memoryMB: Double {

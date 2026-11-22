@@ -4,6 +4,35 @@ import Darwin.POSIX
 import MachO
 import Metal
 
+// IOKit type definitions (opaque mach port handles)
+private typealias io_object_t = mach_port_t
+private typealias io_iterator_t = io_object_t
+private typealias io_registry_entry_t = io_object_t
+private typealias io_service_t = io_object_t
+
+// Darwin libproc taskinfo structure
+public struct proc_taskinfo {
+    public var pti_virtual_size: UInt64 = 0
+    public var pti_resident_size: UInt64 = 0
+    public var pti_total_user: UInt64 = 0
+    public var pti_total_system: UInt64 = 0
+    public var pti_threads_user: UInt64 = 0
+    public var pti_threads_system: UInt64 = 0
+    public var pti_policy: Int32 = 0
+    public var pti_faults: Int32 = 0
+    public var pti_pageins: Int32 = 0
+    public var pti_cow_faults: Int32 = 0
+    public var pti_messages_sent: Int32 = 0
+    public var pti_messages_received: Int32 = 0
+    public var pti_syscalls_mach: Int32 = 0
+    public var pti_syscalls_unix: Int32 = 0
+    public var pti_csw: Int32 = 0
+    public var pti_threadnum: Int32 = 0
+    public var pti_numrunning: Int32 = 0
+    public var pti_priority: Int32 = 0
+    public init() {}
+}
+
 public final class DarwinBridge {
     public static let shared = DarwinBridge()
     
@@ -121,7 +150,7 @@ public final class DarwinBridge {
         var processorInfoCount: mach_msg_type_number_t = 0
         
         let now = Date().timeIntervalSince1970
-        let deltaSec = max(0.1, now - prevTimestamp)
+        _ = max(0.1, now - prevTimestamp)
         prevTimestamp = now
         
         let status = host_processor_info(
@@ -434,7 +463,7 @@ public final class DarwinBridge {
                 
                 // Data packet stats (AF_LINK)
                 if family == UInt8(AF_LINK), let data = cur.pointee.ifa_data {
-                    let ifData = unsafeBitCast(data, to: UnsafeMutablePointer<if_data>.self)
+                    let ifData = data.assumingMemoryBound(to: if_data.self)
                     let inB = UInt64(ifData.pointee.ifi_ibytes)
                     let outB = UInt64(ifData.pointee.ifi_obytes)
                     let baudrate = Double(ifData.pointee.ifi_baudrate)
