@@ -28,6 +28,7 @@ public struct proc_taskinfo {
     public var pti_syscalls_unix: Int32 = 0
     public var pti_csw: Int32 = 0
     public var pti_threadnum: Int32 = 0
+    public var pti_threads_count: Int32 { return pti_threadnum }
     public var pti_numrunning: Int32 = 0
     public var pti_priority: Int32 = 0
     public init() {}
@@ -607,10 +608,8 @@ public final class DarwinBridge {
             
             var nameBuffer = [CChar](repeating: 0, count: 64)
             _ = pName(pid, &nameBuffer, UInt32(nameBuffer.count))
-            var procString = String(cString: nameBuffer)
-            if procString.isEmpty {
-                procString = "pid_\(pid)"
-            }
+            let rawName = String(cString: nameBuffer)
+            let procString = rawName.isEmpty ? "pid_\(pid)" : rawName
             
             var cpuPct: Double = 0.0
             var memBytes: UInt64 = 0
@@ -619,7 +618,7 @@ public final class DarwinBridge {
             if res == taskSize {
                 let totalCPUTime = taskInfo.pti_total_user + taskInfo.pti_total_system
                 memBytes = taskInfo.pti_resident_size
-                threadsCount = Int(taskInfo.pti_threads_count)
+                threadsCount = Int(taskInfo.pti_threadnum)
                 
                 if let prev = prevProcessCPUTimes[pid] {
                     let dTime = now - prev.timestamp
